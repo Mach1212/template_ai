@@ -1,3 +1,4 @@
 notes/*
-!notes/idea.md
+!notes/specs/
+!notes/specs/**
 .DS_Store

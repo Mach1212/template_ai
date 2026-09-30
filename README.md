@@ -5,9 +5,9 @@ GitHub template for Grok-driven projects.
 1. Use this template (or clone it).
 2. Talk to Grok about what you want.
 3. Implement.
-4. When you change your mind, Grok rewrites `notes/idea.md` to the current spec.
+4. As you add features and design instructions, Grok refactors them into spec docs under `notes/specs/`.
 
-| file | role |
+| path | role |
 |------|------|
-| `AGENTS.md` | merge every user want / spec / plan change into `notes/idea.md` |
-| `notes/idea.md` | live spec — current desired state, not a changelog |
+| `AGENTS.md` | keep `notes/specs/` as the live user spec |
+| `notes/specs/` | spec docs — current desired state of every user desire and instruction |
