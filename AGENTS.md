@@ -30,6 +30,10 @@ On any USER:
 - ❌ changelog · dates · history · impl USER did not decide · agent guesses
 - ❌ one monolith file
 
+## commit
+
+`notes/specs/` is tracked → commit spec changes with the code they describe. Each agent's branch carries its version of the spec; merge specs like code.
+
 ## read
 
 Before plan / implement / review vs wants → read every doc in `notes/specs/`.
