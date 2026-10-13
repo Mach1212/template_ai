@@ -2,7 +2,7 @@
 
 SoT: `notes/specs/` = live log of USER desires + instructions (wants · features · ideas · decisions).
 
-No `notes/idea.md`. Missing dir → create `notes/specs/`.
+Missing dir → create `notes/specs/`.
 
 ## write — same turn, before code
 
