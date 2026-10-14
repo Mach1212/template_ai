@@ -52,6 +52,7 @@ Source: `/Users/mach12/personal/agent_docs` (the cross-repo knowledge repo). Ins
   - `ELASTICSEARCH_PROD_ADDRESS`
   - `ELASTICSEARCH_PROD_API_KEY`
 - Activation decrypts that file to `/home/mach12/projects/api.key` (mode 600). The plaintext is not in git and not in the Nix store. Other names in `~/projects/api.key` stay off the hosts.
+- The OpenCode skills' MCP servers (Jira, GitHub, Elasticsearch) work on the hosts like on the workstation: their commands (`uvx`, `npx`, `github-mcp-server`) are at the workstation's paths, and their tokens are in the `t3code` service env (`api.key`, plus the github.ibm.com token as `GITHUB_PERSONAL_ACCESS_TOKEN`).
 - Recipients: the existing mach12 age key (`age1m40j2a34zls3en9nng35asknxwvf7yttrdskr4sjn5w9a4jltyjqepmsvr`) and each host’s SSH host key (`/etc/ssh/ssh_host_ed25519_key`, converted with `ssh-to-age`). No extra private key is copied onto the hosts.
 
 Profile path: `/nix/var/nix/profiles/t3`.

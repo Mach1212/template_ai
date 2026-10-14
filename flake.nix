@@ -77,6 +77,9 @@
         Environment=HOME=${t3Home}
         Environment=XDG_CONFIG_HOME=${t3Home}/.config
         Environment=PATH=${profile}/bin:/usr/bin:/bin
+        # skills' MCP env (`''${JIRA_PERSONAL_TOKEN}`, …) expands from the OpenCode process env
+        EnvironmentFile=-${t3Home}/projects/api.key
+        EnvironmentFile=-${devEnvDir}/mcp.env
         WorkingDirectory=${t3Home}
         ExecStart=${profile}/bin/t3 serve --host 0.0.0.0 --port 3773 --base-dir ${t3Home}/.t3
         Restart=on-failure
@@ -295,6 +298,9 @@
           > ${t3Home}/.git-credentials
         chown ${t3User}:${t3User} ${t3Home}/.git-credentials
         chmod 600 ${t3Home}/.git-credentials
+        printf 'GITHUB_PERSONAL_ACCESS_TOKEN=%s\n' "$(dev_get GHE_TOKEN)" > ${devEnvDir}/mcp.env
+        chown ${t3User}:${t3User} ${devEnvDir}/mcp.env
+        chmod 600 ${devEnvDir}/mcp.env
         rm -f "$dev_out"
         su -s /bin/sh ${t3User} -c '
           export HOME=${t3Home}
@@ -326,6 +332,8 @@
           playwrightMcp
           opSignin
           nodeDev
+          pkgs.uv
+          pkgs.github-mcp-server
           pkgs.nodemon
           pkgs.poetry
         ];
@@ -411,6 +419,11 @@
         chmod 644 /etc/profile.d/t3-tools.sh
         mkdir -p /usr/local/bin
         ln -sfn ${profile}/bin/op /usr/local/bin/op
+        # workstation skills hardcode nix-darwin's per-user profile path
+        mkdir -p /etc/profiles/per-user/${t3User}/bin
+        for bin in uvx npx github-mcp-server; do
+          ln -sfn ${profile}/bin/$bin /etc/profiles/per-user/${t3User}/bin/$bin
+        done
 
         install -m 644 ${t3Unit} /etc/systemd/system/t3code.service
         systemctl daemon-reload
