@@ -334,6 +334,8 @@
           nodeDev
           pkgs.uv
           pkgs.github-mcp-server
+          # openrtk plugin: `which rtk` at load, else it disables itself
+          pkgs.rtk
           pkgs.nodemon
           pkgs.poetry
         ];
@@ -361,6 +363,7 @@
         rm -rf ${t3Home}/.config/opencode.new
         mkdir -p ${t3Home}/.config/opencode.new
         cp -a ${opencode-config}/. ${t3Home}/.config/opencode.new/
+        find ${t3Home}/.config/opencode.new -name '._*' -delete
         chmod -R u+rwX ${t3Home}/.config/opencode.new
         if [ -f ${t3Home}/.config/opencode.new/opencode.jsonc ]; then
           sed -i \
@@ -374,6 +377,7 @@
         rm -rf ${t3Home}/personal/agent_docs
         mkdir -p ${t3Home}/personal/agent_docs
         cp -a ${agent-docs}/. ${t3Home}/personal/agent_docs/
+        find ${t3Home}/personal/agent_docs -name '._*' -delete
         chown -R ${t3User}:${t3User} ${t3Home}/personal/agent_docs
         rm -rf ${t3Home}/projects/.agents
         ln -s ${t3Home}/personal/agent_docs ${t3Home}/projects/.agents

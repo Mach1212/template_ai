@@ -36,7 +36,8 @@ for host in $hosts; do
 done
 
 echo "== copy flake to mach121 =="
-tar -C "$root" \
+# COPYFILE_DISABLE: macOS tar otherwise adds AppleDouble `._*` files, which OpenCode then loads as plugins
+COPYFILE_DISABLE=1 tar -C "$root" \
   --exclude .git \
   --exclude notes \
   -czf - . | $ssh "root@mach121.$domain" 'rm -rf /root/t3ibm && mkdir -p /root/t3ibm && tar -C /root/t3ibm -xzf -'

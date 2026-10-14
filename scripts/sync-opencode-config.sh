@@ -27,11 +27,12 @@ git -C "$src" ls-files -z | while IFS= read -r -d '' file; do
   cp -a "$src/$file" "$dest/$file"
 done
 
-tar -C "$agent_docs" \
+COPYFILE_DISABLE=1 tar -C "$agent_docs" \
   --exclude .git \
   --exclude .omo \
   --exclude .codegraph \
   --exclude .DS_Store \
+  --exclude '._*' \
   -cf - . | tar -C "$docs" -xf -
 
 git -C "$src" rev-parse HEAD > "$dest/.rev"
