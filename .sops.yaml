@@ -1,0 +1,15 @@
+keys:
+  - &user_mach12 age1m40j2a34zls3en9nng35asknxwvf7yttrdskr4sjn5w9a4jltyjqepmsvr
+  - &mach121 age1xwy4g5rdymvsxpt864d535z457vfy7ma4wh9tdm0x2a0mdkq556selqv2x
+  - &mach122 age1mcra3a6qu68acc8pxnew7mcx6dkv0crfyr0z6c5htw42ltsgausqmqqv8y
+  - &mach123 age18ceu5mcjl8em5hna0ls6ulzxfrt7rv4nlcs9gdeeeu96ctskdv8szjhtq6
+  - &mach124 age1m8mzs7u2gafe0eqyl3p9hyq0xasuuplupv2c2ax6372aj09zcg0q6r26a9
+creation_rules:
+  - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
+    key_groups:
+      - age:
+          - *user_mach12
+          - *mach121
+          - *mach122
+          - *mach123
+          - *mach124

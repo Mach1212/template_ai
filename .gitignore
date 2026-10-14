@@ -2,3 +2,5 @@ notes/*
 !notes/specs/
 !notes/specs/**
 .DS_Store
+opencode-config/
+payload/

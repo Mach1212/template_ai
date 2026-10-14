@@ -1,13 +1,11 @@
-# template_grok
+# t3ibm
 
-GitHub template for Grok-driven projects.
+deploy-rs for four RHEL Fyre hosts. Each host gets multi-user Nix, a `t3code` server on port 3773, and the OpenCode config from `github.ibm.com/Maciej-Pruchnik/bob_code`.
 
-1. Use this template (or clone it).
-2. Talk to Grok about what you want.
-3. Implement.
-4. As you add features and design instructions, Grok refactors them into spec docs under `notes/specs/`.
+```sh
+./scripts/deploy.sh
+```
 
-| path | role |
-|------|------|
-| `AGENTS.md` | keep `notes/specs/` as the live user spec |
-| `notes/specs/` | spec docs — current desired state of every user desire and instruction |
+`scripts/sync-opencode-config.sh` fills gitignored `opencode-config/` and `payload/` from the local checkout before deploy. `secrets/api.key.env` is a SOPS dotenv of the OpenCode keys only (ICA, Carbon, Jira, Elasticsearch). Hosts decrypt it with their SSH host key. The Playwright skill on the hosts is rewritten to headless Chromium; the workstation copy stays the Edge extension.
+
+The workstation cannot build `x86_64-linux`. `deploy.sh` bootstraps Nix, then runs `nix run .#deploy-rs -- --skip-checks .` on `mach121`. The package is `deploy-rs`, not `deploy`, so `.#deploy` stays the deploy-rs node set.
