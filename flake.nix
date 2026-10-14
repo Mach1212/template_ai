@@ -164,7 +164,7 @@
         s=$(cat "$tok" 2>/dev/null || true)
         # sessions expire after 30 min idle; skip the whoami round trip while fresh
         if [ -z "$s" ] || { [ -z "$(find "$tok" -mmin -20 2>/dev/null)" ] \
-          && ! "$real" whoami --session "$s" >/dev/null 2>&1; }; then
+          && ! "$real" whoami --session "$s" >/dev/null 2>&1 9>&-; }; then
           address=$(get OP_ADDRESS)
           # op reads the password, then the 2FA code, from stdin; the code must arrive after the prompt.
           # Generate the code first, early in its 30 s window, so it can't roll over mid sign-in.
@@ -175,11 +175,12 @@
             sleep 2
             printf '%s\n' "$code"
           }
-          if "$real" account list --format json | grep -q "\"$address\""; then
-            s=$(answers | "$real" signin --account "$address" --raw)
+          # 9>&-: op may spawn a long-lived `op daemon`; it must not inherit the lock fd
+          if "$real" account list --format json 9>&- | grep -q "\"$address\""; then
+            s=$(answers | "$real" signin --account "$address" --raw 9>&-)
           else
             s=$(answers | "$real" account add --address "$address" \
-              --email "$(get OP_EMAIL)" --secret-key "$(get OP_SECRET_KEY)" --signin --raw)
+              --email "$(get OP_EMAIL)" --secret-key "$(get OP_SECRET_KEY)" --signin --raw 9>&-)
           fi
           printf '%s' "$s" > "$tok"
         fi
@@ -210,6 +211,10 @@
         chown ${t3User}:${t3User} ${t3Home}/.config/op/t3-signin.env
         chmod 600 ${t3Home}/.config/op/t3-signin.env
         rm -f ${t3Home}/.config/op/t3-session
+        # an `op daemon` that inherited the wrapper's lock fd holds flock forever; drop it
+        pkill -u ${t3User} -x op 2>/dev/null || true
+        pkill -u ${t3User} -f '^op daemon' 2>/dev/null || true
+        rm -f ${t3Home}/.config/op/t3-session.lock ${t3Home}/.config/op/op-daemon.sock
 
         printf 'https://%s:%s@github.ibm.com\n' "$(dev_get GHE_USER)" "$(dev_get GHE_TOKEN)" \
           > ${t3Home}/.git-credentials
@@ -328,6 +333,14 @@
         fi
         chown ${t3User}:${t3User} "$auth"
         chmod 600 "$auth"
+
+        # T3 provider: OpenCode enabled (same as mach121's UI-set config); other settings kept
+        t3set=${t3Home}/.t3/userdata/settings.json
+        install -d -o ${t3User} -g ${t3User} ${t3Home}/.t3/userdata
+        [ -s "$t3set" ] || echo '{}' > "$t3set"
+        ${pkgs.jq}/bin/jq '.providerInstances.opencode = {"driver":"opencode","enabled":true,"config":{"binaryPath":"opencode","serverUrl":"","serverPassword":"","customModels":[]}}' "$t3set" > "$t3set.new"
+        mv "$t3set.new" "$t3set"
+        chown ${t3User}:${t3User} "$t3set"
 
         install -d -o ${t3User} -g ${t3User} \
           ${t3Home}/.config/opencode/skills/playwright

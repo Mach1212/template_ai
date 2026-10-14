@@ -9,7 +9,8 @@ Demo: copy the workstation dev env (`~/projects`) to `mach121` (`/home/mach12/pr
 
 ## How
 
-- Tools come from the flake deploy profile, for all hosts: 1Password CLI, node 18, nodemon, poetry. `scripts/dev-env.sh <host>` does the clones, env files, and models (run for `mach121` now).
+- Tools come from the flake deploy profile, for all hosts: 1Password CLI, node 18, nodemon, poetry. `scripts/dev-env.sh <host>` does the clones, env files, and models, on every host (mach121–124).
+- All hosts carry the same askswsupport `dev_env` as mach121 (including its local feature-branch merges).
 - 1Password: no service account. `op` signs in by itself on the host with the user's email, password, Secret Key, and two-factor TOTP seed (codes generated on the host) from SOPS, so it works without the user.
 - `local.env` (plaintext secrets that aren't in 1Password) is SOPS-encrypted in this repo and decrypted on the host.
 - Each host gets its own queues: every queue name in its `local.env` has `_<host>` appended (`ask_input_maciej_dev` → `ask_input_maciej_dev_mach121` on mach121, `_mach122` on mach122, …).

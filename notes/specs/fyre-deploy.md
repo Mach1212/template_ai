@@ -25,6 +25,7 @@ This flake is the desired state. Apply it with deploy-rs from a host that can bu
 - `t3 serve --host 0.0.0.0 --port 3773 --base-dir /home/mach12/.t3`
 - User `mach12`.
 - Service env sets `NIX_SSL_CERT_FILE` and `SSL_CERT_FILE` to `/etc/pki/tls/certs/ca-bundle.crt`, so Nix tools (npx MCP servers, git) verify TLS.
+- All hosts match mach121's setup. T3 `~/.t3/userdata/settings.json` has the OpenCode provider enabled (`providerInstances.opencode`, binary `opencode`); the deploy sets it and keeps other settings.
 
 ## OpenCode config
 
