@@ -1,17 +1,5 @@
 {
   "nodes": {
-    "agent-docs": {
-      "flake": false,
-      "locked": {
-        "path": "./payload/agent-docs",
-        "type": "path"
-      },
-      "original": {
-        "path": "./payload/agent-docs",
-        "type": "path"
-      },
-      "parent": []
-    },
     "deploy-rs": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -96,7 +84,6 @@
     },
     "root": {
       "inputs": {
-        "agent-docs": "agent-docs",
         "deploy-rs": "deploy-rs",
         "nixpkgs": "nixpkgs",
         "nixpkgs-node18": "nixpkgs-node18",

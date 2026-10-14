@@ -12,10 +12,6 @@
       url = "path:./opencode-config";
       flake = false;
     };
-    agent-docs = {
-      url = "path:./payload/agent-docs";
-      flake = false;
-    };
   };
 
   outputs =
@@ -25,7 +21,6 @@
       nixpkgs-node18,
       deploy-rs,
       opencode-config,
-      agent-docs,
     }:
     let
       system = "x86_64-linux";
@@ -63,6 +58,7 @@
       t3Home = "/home/${t3User}";
       gitName = "Maciej-Pruchnik";
       gitEmail = "maciej.pruchnik@ibm.com";
+      agentDocsUrl = "https://github.ibm.com/Maciej-Pruchnik/agent_docs.git";
 
       t3Unit = pkgs.writeText "t3code.service" ''
         [Unit]
@@ -228,6 +224,28 @@
           $g config --global user.email ${lib.escapeShellArg gitEmail}
         '
 
+        # ~/projects/.agents: live clone of agent_docs; agents pull/push it, so never overwrite a clone
+        agents=${t3Home}/projects/.agents
+        if [ -L "$agents" ] || { [ -e "$agents" ] && [ ! -d "$agents/.git" ]; }; then
+          rm -rf "$agents"
+        fi
+        rm -rf ${t3Home}/personal/agent_docs
+        [ -L ${t3Home}/.agents ] && rm -f ${t3Home}/.agents
+        if [ ! -d "$agents/.git" ]; then
+          su -s /bin/sh ${t3User} -c '
+            export HOME=${t3Home}
+            g=${pkgs.git}/bin/git
+            $g clone ${agentDocsUrl} ${t3Home}/projects/.agents
+          '
+        fi
+        su -s /bin/sh ${t3User} -c '
+          export HOME=${t3Home}
+          g=${pkgs.git}/bin/git
+          h=$(hostname -s)
+          $g -C ${t3Home}/projects/.agents config user.name "Agent ($h)"
+          $g -C ${t3Home}/projects/.agents config user.email "agent@$h.dev.fyre.ibm.com"
+        '
+
         for repo in askswsupport hyparest; do
           src=${./secrets}/$repo.local.env.json
           [ -f "$src" ] || continue
@@ -296,14 +314,6 @@
         rm -rf ${t3Home}/.config/opencode
         mv ${t3Home}/.config/opencode.new ${t3Home}/.config/opencode
 
-        rm -rf ${t3Home}/personal/agent_docs
-        mkdir -p ${t3Home}/personal/agent_docs
-        cp -a ${agent-docs}/. ${t3Home}/personal/agent_docs/
-        find ${t3Home}/personal/agent_docs -name '._*' -delete
-        chown -R ${t3User}:${t3User} ${t3Home}/personal/agent_docs
-        rm -rf ${t3Home}/projects/.agents
-        ln -s ${t3Home}/personal/agent_docs ${t3Home}/projects/.agents
-        chown -h ${t3User}:${t3User} ${t3Home}/projects/.agents
         install -d -o ${t3User} -g ${t3User} \
           ${t3Home}/.config/opencode/skills/playwright
         install -o ${t3User} -g ${t3User} -m 644 \

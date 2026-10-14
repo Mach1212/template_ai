@@ -37,10 +37,12 @@ That repo stays the config’s GitHub. Do not commit it into this repo (this rep
 
 ## agent_docs
 
-Source: `/Users/mach12/personal/agent_docs` (the cross-repo knowledge repo). Installed to `/home/mach12/personal/agent_docs`. Not committed into this repo.
+Source: `https://github.ibm.com/Maciej-Pruchnik/agent_docs` (private, `master`), the cross-repo knowledge repo. Not committed into this repo and not copied in by the deploy.
 
-- `/home/mach12/projects/.agents` is a symlink to `/home/mach12/personal/agent_docs`.
-- Rewrite the OpenCode `instructions` path to `/home/mach12/projects/.agents/AGENTS.md`. That path is the repo’s `AGENTS.md` through the symlink. Sibling docs (`analyze/`, `askswsupport/`) stay beside it.
+- `/home/mach12/projects/.agents` is a git clone of that repo, owned by `mach12`. The deploy clones it when it is missing and leaves an existing clone alone (agents commit and push there).
+- Clone git author: `Agent (<host>)` / `agent@<host>.dev.fyre.ibm.com`.
+- Rewrite the OpenCode `instructions` path to `/home/mach12/projects/.agents/AGENTS.md`. Sibling docs (`analyze/`, `askswsupport/`) stay beside it.
+- Agents check the clone is up to date once, on the user's first message of a conversation (rule lives in the repo's `AGENTS.md`).
 - Do not vendor `oh-my-openagent/` or `node_modules`. OpenCode loads `oh-my-openagent` itself.
 - Playwright on these hosts is headless Chromium from the Nix profile (`playwright-mcp --headless`). The deployed `skills/playwright/SKILL.md` is replaced at activation. The workstation skill stays the Edge extension. No Edge session and no `PLAYWRIGHT_MCP_EXTENSION_TOKEN` on the hosts. Headless Chromium does not have the workstation's Edge cookies.
 - Secrets are SOPS (age). `secrets/api.key.env` is only these names, taken from the workstation `~/projects/api.key`:

@@ -34,32 +34,13 @@ clone_org() {
   echo "$1: no dev_env/development/dev/main/master on origin" >&2
   return 1
 }
-clone_personal() {
-  url=https://github.com/Mach1212/$1.git
-  if [ ! -d "$1/.git" ]; then
-    git clone "$url" "$1"
-  fi
-  git -C "$1" fetch origin
-  if git -C "$1" rev-parse -q --verify "refs/remotes/origin/master" >/dev/null; then
-    git -C "$1" checkout -B master "origin/master"
-    git -C "$1" branch --set-upstream-to "origin/master" master
-    echo "$1 -> master"
-    return
-  fi
-  echo "$1: no master on origin" >&2
-  return 1
-}
 clone_org askswsupport
 clone_org hyparest
 clone_org WatsonFlow
-clone_personal agent-docs
 
 install -m 600 ~/.config/t3-dev-env/askswsupport.local.env askswsupport/nodejs-app01/local.env
 install -m 600 ~/.config/t3-dev-env/hyparest.local.env hyparest/local.env
-ln -sfn ../agent-docs ~/.agents
 host=$(hostname -s)
-git -C agent-docs config user.email "agent@$host.dev.fyre.ibm.com"
-git -C agent-docs config user.name "Agent ($host)"
 sed -i -E \
   -e "s|/Users/mach12/projects|$HOME/projects|g" \
   -e "s/^([A-Z0-9_]*QUEUE[A-Z0-9_]*=)([^ #]+)/\1\2_$host/" \
