@@ -89,95 +89,13 @@
         WantedBy=multi-user.target
       '';
 
-      # Same build as the workstation (Homebrew opencode 2.0.25). nixpkgs is still on 1.19,
-      # and upstream ships no 2.x Linux release asset. Homebrew's x86_64_linux bottle is
-      # linked against linuxbrew's ld.so + ICU 78, so it is re-pointed at Nix's.
-      opencode = pkgs.stdenv.mkDerivation {
-        pname = "opencode";
-        version = "2.0.25";
-        src = pkgs.fetchurl {
-          name = "opencode-2.0.25.x86_64_linux.bottle.tar.gz";
-          url = "https://ghcr.io/v2/homebrew/core/opencode/blobs/sha256:5b8a5fd93c49afcbaa45ee8e0be7d367833b7ba789ac5c034168b02b430de259";
-          curlOptsList = [
-            "-H"
-            "Authorization: Bearer QQ=="
-          ];
-          sha256 = "5b8a5fd93c49afcbaa45ee8e0be7d367833b7ba789ac5c034168b02b430de259";
-        };
-        sourceRoot = "opencode/2.0.25";
-        nativeBuildInputs = [
-          pkgs.autoPatchelfHook
-          pkgs.makeWrapper
-        ];
-        buildInputs = [
-          pkgs.icu78
-          pkgs.stdenv.cc.cc.lib
-        ];
-        # optional audio backends, dlopen'd only by the TUI
-        autoPatchelfIgnoreMissingDeps = [
-          "libasound.so.2"
-          "libpulse.so.0"
-        ];
-        dontStrip = true;
-        installPhase = ''
-          runHook preInstall
-          install -Dm755 bin/opencode $out/bin/opencode
-          cp -r share $out/share
-          wrapProgram $out/bin/opencode \
-            --prefix PATH : ${lib.makeBinPath [ pkgs.ripgrep ]} \
-            --set OPENCODE_DISABLE_AUTOUPDATE true
-          runHook postInstall
-        '';
-        meta.mainProgram = "opencode";
-      };
-
-      # T3 0.0.46 is the first release that supports OpenCode 2 (>=2.0.18); 0.0.45 marks all 2.x broken.
-      # Upstream's prebuilt linux-x64 server: a single Node SEA plus native addons.
-      t3Version = "0.0.46-nightly.20261013.3080";
-      t3Unwrapped = pkgs.stdenv.mkDerivation {
-        pname = "t3code-unwrapped";
-        version = t3Version;
-        src = pkgs.fetchurl {
-          url = "https://github.com/pingdotgg/t3code/releases/download/v${t3Version}/t3-${t3Version}-linux-x64.tar.gz";
-          sha256 = "d3df682ffdafa01ecf1a1268b380b5ddd28421bef9404674a6e86ed85f454f81";
-        };
-        nativeBuildInputs = [
-          pkgs.autoPatchelfHook
-          pkgs.makeWrapper
-        ];
-        buildInputs = [
-          pkgs.stdenv.cc.cc.lib
-          pkgs.libsecret
-          pkgs.glib
-        ];
-        autoPatchelfIgnoreMissingDeps = true;
-        # the SEA payload sits after the ELF; strip/patchelf on t3 itself would drop it
-        dontStrip = true;
-        dontAutoPatchelf = true;
-        installPhase = ''
-          runHook preInstall
-          mkdir -p $out/libexec/t3code $out/bin
-          cp -a . $out/libexec/t3code/
-          find $out/libexec/t3code/node_modules $out/libexec/t3code/resource-monitor -type f \
-            \( -name '*.node' -o -perm -u+x \) -print0 \
-            | while IFS= read -r -d "" f; do
-                if [ "$(head -c 4 "$f" | od -An -tx1 | tr -d ' ')" = 7f454c46 ]; then autoPatchelf "$f"; fi
-              done
-          makeWrapper $out/libexec/t3code/t3 $out/bin/t3 \
-            --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}
-          runHook postInstall
-        '';
-        meta = pkgs.t3code.unwrapped.meta // {
-          mainProgram = "t3";
-        };
-      };
+      # OpenCode 1.19.0 (nixpkgs): newest 1.x, inside T3 0.0.45's supported range
+      # (>=1.14.19 <2.0.0). Same version as the workstation. The plugins (OMO, openrtk,
+      # ibm-ica-auth) use the 1.x plugin API; OpenCode 2.x does not load them.
+      opencode = pkgs.opencode;
 
       t3 = pkgs.t3code.override {
         inherit opencode;
-        t3code-unwrapped = t3Unwrapped;
-        t3code-resource-monitor = pkgs.writeShellScriptBin "t3-resource-monitor" ''
-          exec ${t3Unwrapped}/libexec/t3code/resource-monitor/linux-x64/t3-resource-monitor "$@"
-        '';
         enableOpencode = true;
         enableCodex = false;
       };
@@ -364,6 +282,10 @@
         mkdir -p ${t3Home}/.config/opencode.new
         cp -a ${opencode-config}/. ${t3Home}/.config/opencode.new/
         find ${t3Home}/.config/opencode.new -name '._*' -delete
+        # workstation-only: Edge cookie jar + macOS Keychain; the stock webfetch serves the hosts
+        rm -f ${t3Home}/.config/opencode.new/plugins/edge-cookies-webfetch.ts
+        # jupyter: VS Code extension on the workstation's localhost:9123
+        rm -rf ${t3Home}/.config/opencode.new/skills/jupyter
         chmod -R u+rwX ${t3Home}/.config/opencode.new
         if [ -f ${t3Home}/.config/opencode.new/opencode.jsonc ]; then
           sed -i \
@@ -482,6 +404,7 @@
               p.sops
               p.ssh-to-age
               p.rsync
+              p.coreutils
             ];
           };
         }

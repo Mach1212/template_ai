@@ -17,8 +17,10 @@ This flake is the desired state. Apply it with deploy-rs from a host that can bu
 
 ## T3 Code server
 
-- Package: nixpkgs `t3code` wrapper around upstream's latest nightly server (0.0.46 nightly; 0.0.45 rejects OpenCode 2.x), Codex not wrapped in. Its OpenCode, and the `opencode` on the host `PATH`, is the same version the workstation runs (2.0.25).
-- Workstation (`mach12book`) T3 desktop app is the nightly too: `t3-code@nightly` replaces the stable `t3-code` cask in `~/nix_config`. Back up local T3 data before the swap.
+- Package: nixpkgs `t3code` (stable 0.0.45), Codex not wrapped in. OpenCode is the latest 1.x T3 supports (1.19.0, nixpkgs), the same version on the hosts and the workstation. No OpenCode 2.x, no T3 nightly.
+- Workstation (`mach12book`): OpenCode 1.19.0 from Nix (`~/nix_config`, not brew) and the stable `t3-code` cask.
+- Every OpenCode plugin loads on 1.x: `ibm-ica-auth` (1.x plugin API, works with or without a stored `ica` auth entry), `oh-my-openagent`, `openrtk`, and on the workstation `edge-cookies-webfetch`.
+- Hosts do not get workstation-only pieces: no `edge-cookies-webfetch` plugin, no `jupyter` skill.
 - systemd unit `t3code.service`, enabled at boot.
 - `t3 serve --host 0.0.0.0 --port 3773 --base-dir /home/mach12/.t3`
 - User `mach12`.
