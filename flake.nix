@@ -73,6 +73,9 @@
         Environment=HOME=${t3Home}
         Environment=XDG_CONFIG_HOME=${t3Home}/.config
         Environment=PATH=${profile}/bin:/usr/bin:/bin
+        # Nix OpenSSL finds no CA bundle on RHEL without these (nix.sh sets them for login shells only)
+        Environment=NIX_SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+        Environment=SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
         # skills' MCP env (`''${JIRA_PERSONAL_TOKEN}`, …) expands from the OpenCode process env
         EnvironmentFile=-${t3Home}/projects/api.key
         EnvironmentFile=-${devEnvDir}/mcp.env
