@@ -2,7 +2,8 @@
 
 Demo: copy the workstation dev env (`~/projects`) to `mach121` (`/home/mach12/projects`).
 
-- Clone `askswsupport` and `hyparest` (both on `dev_env`) and `WatsonFlow` (next to them) into `/home/mach12/projects`.
+- Clone `askswsupport`, `hyparest`, and `WatsonFlow` (next to them) into `/home/mach12/projects`.
+- Every repo is checked out on the first branch that exists on origin, in this order: `dev_env` → `dev` (`development` or `dev`) → `main` (`main` or `master`).
 - `npm run devEnv` (`askswsupport/nodejs-app01`) and `./run.sh` (`hyparest`) work on the host.
 - Both resolve secrets through 1Password (`curl -sL https://ibm.biz/mach12_1pass | sh` → `op inject` of `base.env` + `local.env` → `.env`).
 
