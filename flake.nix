@@ -317,6 +317,18 @@
         rm -rf ${t3Home}/.config/opencode
         mv ${t3Home}/.config/opencode.new ${t3Home}/.config/opencode
 
+        # ica auth sentinel: OpenCode calls ibm-ica-auth's loader (custom fetch: store=false,
+        # model-not-found retry) only when auth.json has an ica entry. Real key stays in api.key.
+        auth=${t3Home}/.local/share/opencode/auth.json
+        install -d -o ${t3User} -g ${t3User} ${t3Home}/.local ${t3Home}/.local/share ${t3Home}/.local/share/opencode
+        [ -s "$auth" ] || echo '{}' > "$auth"
+        if ! ${pkgs.jq}/bin/jq -e '.ica' "$auth" >/dev/null; then
+          ${pkgs.jq}/bin/jq '.ica = {"type":"api","key":"ica-key-from-api.key"}' "$auth" > "$auth.new"
+          mv "$auth.new" "$auth"
+        fi
+        chown ${t3User}:${t3User} "$auth"
+        chmod 600 "$auth"
+
         install -d -o ${t3User} -g ${t3User} \
           ${t3Home}/.config/opencode/skills/playwright
         install -o ${t3User} -g ${t3User} -m 644 \

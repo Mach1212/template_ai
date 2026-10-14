@@ -35,6 +35,7 @@ That repo stays the config’s GitHub. Do not commit it into this repo (this rep
 - Install the repo’s committed `AGENTS.md` with the rest of the config. OpenCode loads `/home/mach12/.config/opencode/AGENTS.md` as the global agent doc. Do not overlay `~/.grok/rules/AGENTS.md`. Do not list that file in `instructions`.
 - Sisyphus reasoning is `max`. The lead model `ica/claude-opus-5-5` pins its low, medium, and high variants to `reasoningEffort: max`, because T3 always sends one of those variants and that variant overrides the model option.
 - `shell` stays `zsh`. `zsh` and `git` are on the service `PATH`.
+- ICA `Model not found` retry (in `ibm-ica-auth`) runs on the hosts: activation adds the `ica` api sentinel to `~/.local/share/opencode/auth.json` when missing (real key stays in `api.key`).
 
 ## agent_docs
 
