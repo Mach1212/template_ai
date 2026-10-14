@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-node18.url = "github:NixOS/nixpkgs/abae504e2aaed4fcf99c401beb4f56811b302082";
     deploy-rs = {
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -11,22 +12,57 @@
       url = "path:./opencode-config";
       flake = false;
     };
+    agent-docs = {
+      url = "path:./payload/agent-docs";
+      flake = false;
+    };
   };
 
   outputs =
     {
       self,
       nixpkgs,
+      nixpkgs-node18,
       deploy-rs,
       opencode-config,
+      agent-docs,
     }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
-      lib = pkgs.lib;
+      lib = nixpkgs.lib;
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfreePredicate = p: lib.getName p == "1password-cli";
+      };
+      node18Pkgs = nixpkgs-node18.legacyPackages.${system};
+      node18 = node18Pkgs.nodejs_18;
+      # ibm_db's prebuilt DB2 clidriver links libcrypt.so.1 / libpam / libxml2; RHEL 10 has
+      # libcrypt.so.2 only. Libs come from node18's nixpkgs so their glibc matches node's.
+      nodeDev = pkgs.symlinkJoin {
+        name = "nodejs-18-dev";
+        paths = [ node18 ];
+        nativeBuildInputs = [ pkgs.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/node \
+            --prefix LD_LIBRARY_PATH : ${
+              lib.makeLibraryPath (
+                with node18Pkgs;
+                [
+                  libxcrypt-legacy
+                  pam
+                  stdenv.cc.cc.lib
+                  zlib
+                  libxml2
+                ]
+              )
+            }
+        '';
+      };
       profile = "/nix/var/nix/profiles/t3";
       t3User = "mach12";
       t3Home = "/home/${t3User}";
+      gitName = "Maciej-Pruchnik";
+      gitEmail = "maciej.pruchnik@ibm.com";
 
       t3Unit = pkgs.writeText "t3code.service" ''
         [Unit]
@@ -50,7 +86,95 @@
         WantedBy=multi-user.target
       '';
 
+      # Same build as the workstation (Homebrew opencode 2.0.25). nixpkgs is still on 1.19,
+      # and upstream ships no 2.x Linux release asset. Homebrew's x86_64_linux bottle is
+      # linked against linuxbrew's ld.so + ICU 78, so it is re-pointed at Nix's.
+      opencode = pkgs.stdenv.mkDerivation {
+        pname = "opencode";
+        version = "2.0.25";
+        src = pkgs.fetchurl {
+          name = "opencode-2.0.25.x86_64_linux.bottle.tar.gz";
+          url = "https://ghcr.io/v2/homebrew/core/opencode/blobs/sha256:5b8a5fd93c49afcbaa45ee8e0be7d367833b7ba789ac5c034168b02b430de259";
+          curlOptsList = [
+            "-H"
+            "Authorization: Bearer QQ=="
+          ];
+          sha256 = "5b8a5fd93c49afcbaa45ee8e0be7d367833b7ba789ac5c034168b02b430de259";
+        };
+        sourceRoot = "opencode/2.0.25";
+        nativeBuildInputs = [
+          pkgs.autoPatchelfHook
+          pkgs.makeWrapper
+        ];
+        buildInputs = [
+          pkgs.icu78
+          pkgs.stdenv.cc.cc.lib
+        ];
+        # optional audio backends, dlopen'd only by the TUI
+        autoPatchelfIgnoreMissingDeps = [
+          "libasound.so.2"
+          "libpulse.so.0"
+        ];
+        dontStrip = true;
+        installPhase = ''
+          runHook preInstall
+          install -Dm755 bin/opencode $out/bin/opencode
+          cp -r share $out/share
+          wrapProgram $out/bin/opencode \
+            --prefix PATH : ${lib.makeBinPath [ pkgs.ripgrep ]} \
+            --set OPENCODE_DISABLE_AUTOUPDATE true
+          runHook postInstall
+        '';
+        meta.mainProgram = "opencode";
+      };
+
+      # T3 0.0.46 is the first release that supports OpenCode 2 (>=2.0.18); 0.0.45 marks all 2.x broken.
+      # Upstream's prebuilt linux-x64 server: a single Node SEA plus native addons.
+      t3Version = "0.0.46-nightly.20261013.3080";
+      t3Unwrapped = pkgs.stdenv.mkDerivation {
+        pname = "t3code-unwrapped";
+        version = t3Version;
+        src = pkgs.fetchurl {
+          url = "https://github.com/pingdotgg/t3code/releases/download/v${t3Version}/t3-${t3Version}-linux-x64.tar.gz";
+          sha256 = "d3df682ffdafa01ecf1a1268b380b5ddd28421bef9404674a6e86ed85f454f81";
+        };
+        nativeBuildInputs = [
+          pkgs.autoPatchelfHook
+          pkgs.makeWrapper
+        ];
+        buildInputs = [
+          pkgs.stdenv.cc.cc.lib
+          pkgs.libsecret
+          pkgs.glib
+        ];
+        autoPatchelfIgnoreMissingDeps = true;
+        # the SEA payload sits after the ELF; strip/patchelf on t3 itself would drop it
+        dontStrip = true;
+        dontAutoPatchelf = true;
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out/libexec/t3code $out/bin
+          cp -a . $out/libexec/t3code/
+          find $out/libexec/t3code/node_modules $out/libexec/t3code/resource-monitor -type f \
+            \( -name '*.node' -o -perm -u+x \) -print0 \
+            | while IFS= read -r -d "" f; do
+                if [ "$(head -c 4 "$f" | od -An -tx1 | tr -d ' ')" = 7f454c46 ]; then autoPatchelf "$f"; fi
+              done
+          makeWrapper $out/libexec/t3code/t3 $out/bin/t3 \
+            --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}
+          runHook postInstall
+        '';
+        meta = pkgs.t3code.unwrapped.meta // {
+          mainProgram = "t3";
+        };
+      };
+
       t3 = pkgs.t3code.override {
+        inherit opencode;
+        t3code-unwrapped = t3Unwrapped;
+        t3code-resource-monitor = pkgs.writeShellScriptBin "t3-resource-monitor" ''
+          exec ${t3Unwrapped}/libexec/t3code/resource-monitor/linux-x64/t3-resource-monitor "$@"
+        '';
         enableOpencode = true;
         enableCodex = false;
       };
@@ -87,16 +211,123 @@
         Tools: `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_tabs`, `browser_take_screenshot`.
       '';
 
+      opSignin = pkgs.writeShellScriptBin "op" ''
+        set -euo pipefail
+        real=${pkgs._1password-cli}/bin/op
+        export PATH="${
+          lib.makeBinPath [
+            pkgs.coreutils
+            pkgs.findutils
+            pkgs.gnused
+            pkgs.gnugrep
+            pkgs.oath-toolkit
+            pkgs.util-linux
+          ]
+        }:$PATH"
+        # hypa1pass evaluates base.env under `env -i`: HOME unset
+        export HOME="''${HOME:-$(cd ~ && pwd)}"
+        creds="$HOME/.config/op/t3-signin.env"
+        tok="$HOME/.config/op/t3-session"
+
+        if [ -n "''${OP_SERVICE_ACCOUNT_TOKEN:-}" ] || [ ! -r "$creds" ]; then
+          exec "$real" "$@"
+        fi
+        case "''${1:-}" in
+          account | signin | signout | --version | -v | --help | -h | "") exec "$real" "$@" ;;
+        esac
+
+        get() { sed -n "s/^$1=//p" "$creds" | head -n 1; }
+        umask 077
+        # hypa1pass runs `op read` (base.env) and `op inject` concurrently
+        exec 9>"$tok.lock"
+        flock 9
+        s=$(cat "$tok" 2>/dev/null || true)
+        # sessions expire after 30 min idle; skip the whoami round trip while fresh
+        if [ -z "$s" ] || { [ -z "$(find "$tok" -mmin -20 2>/dev/null)" ] \
+          && ! "$real" whoami --session "$s" >/dev/null 2>&1; }; then
+          address=$(get OP_ADDRESS)
+          # op reads the password, then the 2FA code, from stdin; the code must arrive after the prompt.
+          # Generate the code first, early in its 30 s window, so it can't roll over mid sign-in.
+          while [ $(( $(date +%s) % 30 )) -gt 22 ]; do sleep 1; done
+          code=$(oathtool --totp -b "$(get OP_TOTP_SECRET)")
+          answers() {
+            get OP_PASSWORD
+            sleep 2
+            printf '%s\n' "$code"
+          }
+          if "$real" account list --format json | grep -q "\"$address\""; then
+            s=$(answers | "$real" signin --account "$address" --raw)
+          else
+            s=$(answers | "$real" account add --address "$address" \
+              --email "$(get OP_EMAIL)" --secret-key "$(get OP_SECRET_KEY)" --signin --raw)
+          fi
+          printf '%s' "$s" > "$tok"
+        fi
+        touch "$tok"
+        exec 9>&-
+        exec "$real" --session "$s" "$@"
+      '';
+
+      devEnvDir = "${t3Home}/.config/t3-dev-env";
+
+      devEnvSecrets = ''
+        dev_out=$(mktemp)
+        chmod 600 "$dev_out"
+        SOPS_AGE_KEY_FILE="$age_key" ${pkgs.sops}/bin/sops -d --output-type dotenv \
+          ${./secrets/dev-env.env} > "$dev_out"
+        got=$(awk -F= '/^[A-Za-z0-9_]+=/{print $1}' "$dev_out" | sort)
+        want=$(printf '%s\n' GHE_TOKEN GHE_USER OP_ADDRESS OP_EMAIL OP_PASSWORD OP_SECRET_KEY OP_TOTP_SECRET | sort)
+        if [ "$got" != "$want" ]; then
+          echo "dev-env names do not match the deploy set" >&2
+          printf '%s\n' "$got" >&2
+          rm -f "$age_key" "$dev_out"
+          exit 1
+        fi
+        dev_get() { sed -n "s/^$1=//p" "$dev_out" | head -n 1; }
+
+        install -d -o ${t3User} -g ${t3User} -m 700 ${t3Home}/.config/op ${devEnvDir}
+        grep '^OP_' "$dev_out" > ${t3Home}/.config/op/t3-signin.env
+        chown ${t3User}:${t3User} ${t3Home}/.config/op/t3-signin.env
+        chmod 600 ${t3Home}/.config/op/t3-signin.env
+        rm -f ${t3Home}/.config/op/t3-session
+
+        printf 'https://%s:%s@github.ibm.com\n' "$(dev_get GHE_USER)" "$(dev_get GHE_TOKEN)" \
+          > ${t3Home}/.git-credentials
+        chown ${t3User}:${t3User} ${t3Home}/.git-credentials
+        chmod 600 ${t3Home}/.git-credentials
+        rm -f "$dev_out"
+        su -s /bin/sh ${t3User} -c '
+          export HOME=${t3Home}
+          g=${pkgs.git}/bin/git
+          $g config --global credential.https://github.ibm.com.helper store
+          $g config --global user.name ${lib.escapeShellArg gitName}
+          $g config --global user.email ${lib.escapeShellArg gitEmail}
+        '
+
+        for repo in askswsupport hyparest; do
+          src=${./secrets}/$repo.local.env.json
+          [ -f "$src" ] || continue
+          SOPS_AGE_KEY_FILE="$age_key" ${pkgs.sops}/bin/sops -d --input-type json --output-type binary \
+            "$src" > ${devEnvDir}/$repo.local.env
+          chown ${t3User}:${t3User} ${devEnvDir}/$repo.local.env
+          chmod 600 ${devEnvDir}/$repo.local.env
+        done
+      '';
+
       tools = pkgs.buildEnv {
         name = "t3-host-tools";
         paths = [
           t3
-          pkgs.opencode
+          opencode
           pkgs.git
           pkgs.zsh
           pkgs.sops
           pkgs.ssh-to-age
           playwrightMcp
+          opSignin
+          nodeDev
+          pkgs.nodemon
+          pkgs.poetry
         ];
       };
 
@@ -116,7 +347,8 @@
 
         install -d -o ${t3User} -g ${t3User} ${t3Home}/.config
         install -d -o ${t3User} -g ${t3User} ${t3Home}/.t3
-        install -d -o ${t3User} -g ${t3User} -m 755 ${t3Home}/projects/.agents
+        install -d -o ${t3User} -g ${t3User} -m 755 ${t3Home}/personal
+        install -d -o ${t3User} -g ${t3User} -m 755 ${t3Home}/projects
 
         rm -rf ${t3Home}/.config/opencode.new
         mkdir -p ${t3Home}/.config/opencode.new
@@ -131,9 +363,13 @@
         rm -rf ${t3Home}/.config/opencode
         mv ${t3Home}/.config/opencode.new ${t3Home}/.config/opencode
 
-        install -o ${t3User} -g ${t3User} -m 644 \
-          ${./payload/projects-agents.md} \
-          ${t3Home}/projects/.agents/AGENTS.md
+        rm -rf ${t3Home}/personal/agent_docs
+        mkdir -p ${t3Home}/personal/agent_docs
+        cp -a ${agent-docs}/. ${t3Home}/personal/agent_docs/
+        chown -R ${t3User}:${t3User} ${t3Home}/personal/agent_docs
+        rm -rf ${t3Home}/projects/.agents
+        ln -s ${t3Home}/personal/agent_docs ${t3Home}/projects/.agents
+        chown -h ${t3User}:${t3User} ${t3Home}/projects/.agents
         install -d -o ${t3User} -g ${t3User} \
           ${t3Home}/.config/opencode/skills/playwright
         install -o ${t3User} -g ${t3User} -m 644 \
@@ -141,7 +377,6 @@
           ${t3Home}/.config/opencode/skills/playwright/SKILL.md
         su -s /bin/bash ${t3User} -c 'HOME=${t3Home} ${playwrightMcp}/bin/playwright-mcp --version'
 
-        install -d -o ${t3User} -g ${t3User} -m 700 ${t3Home}/projects
         age_key=$(mktemp)
         chmod 600 "$age_key"
         ${pkgs.ssh-to-age}/bin/ssh-to-age -private-key -i /etc/ssh/ssh_host_ed25519_key > "$age_key"
@@ -149,7 +384,6 @@
         chmod 600 "$secret_out"
         SOPS_AGE_KEY_FILE="$age_key" ${pkgs.sops}/bin/sops -d --output-type dotenv \
           ${./secrets/api.key.env} > "$secret_out"
-        rm -f "$age_key"
         got=$(awk -F= '/^[A-Za-z0-9_]+=/{print $1}' "$secret_out" | sort)
         want=$(printf '%s\n' \
           CARBON_MCP_SESSION \
@@ -168,7 +402,15 @@
         fi
         install -o ${t3User} -g ${t3User} -m 600 "$secret_out" ${t3Home}/projects/api.key
         rm -f "$secret_out"
+        ${lib.optionalString (builtins.pathExists ./secrets/dev-env.env) devEnvSecrets}
+        rm -f "$age_key"
         rm -rf /root/t3ibm-secrets
+
+        printf '%s\n' 'case ":$PATH:" in *":${profile}/bin:"*) ;; *) PATH="${profile}/bin:$PATH" ;; esac' \
+          > /etc/profile.d/t3-tools.sh
+        chmod 644 /etc/profile.d/t3-tools.sh
+        mkdir -p /usr/local/bin
+        ln -sfn ${profile}/bin/op /usr/local/bin/op
 
         install -m 644 ${t3Unit} /etc/systemd/system/t3code.service
         systemctl daemon-reload
@@ -211,5 +453,21 @@
       checks.${system} = deploy-rs.lib.${system}.deployChecks self.deploy;
 
       packages.${system}.deploy-rs = deploy-rs.packages.${system}.deploy-rs;
+
+      devShells = lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] (
+        s:
+        let
+          p = nixpkgs.legacyPackages.${s};
+        in
+        {
+          default = p.mkShell {
+            packages = [
+              p.sops
+              p.ssh-to-age
+              p.rsync
+            ];
+          };
+        }
+      );
     };
 }

@@ -1,5 +1,17 @@
 {
   "nodes": {
+    "agent-docs": {
+      "flake": false,
+      "locked": {
+        "path": "./payload/agent-docs",
+        "type": "path"
+      },
+      "original": {
+        "path": "./payload/agent-docs",
+        "type": "path"
+      },
+      "parent": []
+    },
     "deploy-rs": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -54,6 +66,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-node18": {
+      "locked": {
+        "lastModified": 1712269287,
+        "narHash": "sha256-w+I3LxZft4G/Mibet1JmII/ekxJF9SC7mvr0up0+LMo=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "abae504e2aaed4fcf99c401beb4f56811b302082",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "abae504e2aaed4fcf99c401beb4f56811b302082",
+        "type": "github"
+      }
+    },
     "opencode-config": {
       "flake": false,
       "locked": {
@@ -68,8 +96,10 @@
     },
     "root": {
       "inputs": {
+        "agent-docs": "agent-docs",
         "deploy-rs": "deploy-rs",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-node18": "nixpkgs-node18",
         "opencode-config": "opencode-config"
       }
     },

@@ -1,0 +1,53 @@
+#!/bin/sh
+# Clone askswsupport + hyparest (dev_env) and WatsonFlow into /home/mach12/projects on a Fyre host,
+# drop in the decrypted local.env files, install deps, and rsync the action-recommender models.
+# Needs a deploy first (tools, op sign-in, git credential, local.env under ~/.config/t3-dev-env).
+#   ./scripts/dev-env.sh mach121
+set -eu
+
+host=${1:?usage: dev-env.sh <host>}
+fqdn=$host.dev.fyre.ibm.com
+user=mach12
+projects=${PROJECTS:-$HOME/projects}
+ssh="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30"
+
+echo "== clone + deps on $fqdn =="
+$ssh "root@$fqdn" "su - $user -c 'bash -s'" <<'EOF'
+set -euo pipefail
+cd ~/projects
+
+clone() {
+  url=https://github.ibm.com/sw-support-automation/$1.git
+  if [ ! -d "$1/.git" ]; then
+    git clone "$url" "$1"
+  fi
+  git -C "$1" fetch origin
+  if [ -n "$2" ]; then
+    git -C "$1" checkout -B "$2" "origin/$2"
+    git -C "$1" branch --set-upstream-to "origin/$2" "$2"
+  fi
+}
+clone askswsupport dev_env
+clone hyparest dev_env
+clone WatsonFlow ""
+
+install -m 600 ~/.config/t3-dev-env/askswsupport.local.env askswsupport/nodejs-app01/local.env
+install -m 600 ~/.config/t3-dev-env/hyparest.local.env hyparest/local.env
+host=$(hostname -s)
+sed -i -E \
+  -e "s|/Users/mach12/projects|$HOME/projects|g" \
+  -e "s/^([A-Z0-9_]*QUEUE[A-Z0-9_]*=)([^ #]+)/\1\2_$host/" \
+  askswsupport/nodejs-app01/local.env hyparest/local.env
+
+(cd askswsupport/nodejs-app01 && npm ci --no-audit --no-fund)
+(cd hyparest && poetry env use /usr/bin/python3.12 && poetry lock && poetry install --no-interaction)
+EOF
+
+echo "== models -> $fqdn =="
+models=$projects/askswsupport/fm-action-recommender/models
+$ssh "root@$fqdn" "install -d -o $user -g $user /home/$user/projects/askswsupport/fm-action-recommender/models"
+rsync -a --info=progress2 --chown=$user:$user \
+  -e "$ssh" "$models/" "root@$fqdn:/home/$user/projects/askswsupport/fm-action-recommender/models/"
+
+echo "== op check =="
+$ssh "root@$fqdn" "su - $user -c 'op whoami'"
